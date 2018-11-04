@@ -3,13 +3,17 @@
 
 #include "pool.h"
 
+typedef int (*funcPtr) (int x);
+
 struct Queue {
-        int queueArray[MAXTHREADS];
+        funcPtr fp[MAXTHREADS];
         int front,rear;
 };
 
-bool add(struct Queue * q);
-bool extract(struct Queue * q);
+void add(struct Queue * q, funcPtr fp);
+funcPtr extract(struct Queue * q);
+int isEmpty(struct Queue * q);
+
 
 
 #endif
