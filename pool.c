@@ -8,6 +8,13 @@
 #include "queue.h"
 
 typedef void handler_t(int);
+void initializeThreads(pthread_t * tids, int threadCount);
+void thread(void * arg);
+void Pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
+void killThreads(pthread_t * tids, int threadCount);
+void Sem_init(sem_t * sem, int pshared, unsigned int value);
+void V(sem_t * s);
+void P(sem_t * s);
 handler_t *Signal(int signum, handler_t *handler);
 void sigint_handler(int sig);
 
@@ -23,10 +30,10 @@ sem_t mutex;
 sem_t semaphore;
 struct Queue * q;
 pthread_t * tids;
-int work;
-int threadCount;
+int work = 1;
+int threadCount = MAXTHREADS;
 
-void initialize(char ** argv) {
+void initialize(int tCount) {
         work = 1;
         Signal(SIGINT,  sigint_handler);   /* ctrl-c */
         Signal(SIGTSTP, sigint_handler);  /* ctrl-z */
@@ -34,8 +41,8 @@ void initialize(char ** argv) {
         q->front = q->rear = 0;
         Sem_init(&mutex, 0, 1);
         Sem_init(&semaphore, 0, 0);
-        tids = (pthread_t *)malloc(sizeof(pthread_t) * atoi(argv[1])); 
-        threadCount = atoi(argv[1]);
+        tids = (pthread_t *)malloc(sizeof(pthread_t) * tCount); 
+        threadCount = tCount;
         initializeThreads(tids, threadCount);
 }
 
@@ -114,6 +121,8 @@ void addJob(funcPtr fp) {
         V(&semaphore);
 }
 
+
+/**************** Signals handling for a clean termination  ****************/
 
 handler_t *Signal(int signum, handler_t *handler) 
 {

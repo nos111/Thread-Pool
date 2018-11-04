@@ -25,12 +25,12 @@ int main(int argc, char ** argv) {
         }
        
         
-        initialize(argv);
+        initialize(atoi(argv[1]));
         for(int i = 0; i < 20; i++) {
                 addJob(sum);
         }
         while(1) {
-                
+
         }
         
         return 0;
