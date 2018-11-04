@@ -10,8 +10,8 @@ struct Queue {
         int front,rear;
 };
 
-void add(struct Queue * q, funcPtr fp);
-funcPtr extract(struct Queue * q);
+void enqueue(struct Queue * q, funcPtr fp);
+funcPtr dequeue(struct Queue * q);
 int isEmpty(struct Queue * q);
 
 

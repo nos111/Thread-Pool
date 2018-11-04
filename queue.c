@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "queue.h"
 
-void add(struct Queue * q, funcPtr fp) {
+void enqueue(struct Queue * q, funcPtr fp) {
         int index = q->rear + 1;
         if(index >= MAXTHREADS) {
                 index = 0;
@@ -13,7 +13,7 @@ void add(struct Queue * q, funcPtr fp) {
         q->fp[index] = fp;
 }
 
-funcPtr extract(struct Queue * q) {
+funcPtr dequeue(struct Queue * q) {
         int index = q->front + 1;
         if(index >= MAXTHREADS) {
                 index = 0;
