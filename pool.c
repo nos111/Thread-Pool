@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <signal.h>
 #include "pool.h"
 #include "queue.h"
+
+typedef void handler_t(int);
+handler_t *Signal(int signum, handler_t *handler);
+void sigint_handler(int sig);
 
 /* 
         - Add job to queue
@@ -12,44 +18,25 @@
         - Loop while you can
 */
 
+/**************** Global variables ****************/
 sem_t mutex;
 sem_t semaphore;
+struct Queue * q;
+pthread_t * tids;
+int work;
+int threadCount;
 
-int sum(int x) {
-        printf("%d \n", x + 2);
-        return x + 2;
-}
-
-int minus(int x) {
-        printf("%d \n", x - 2);
-        return x - 2;
-}
-
-
-
-int main(int argc, char ** argv) {
-
-        if(argc != 2) {
-                printf("Usage: <thread count> \n");
-                return 0;
-        }
-        struct Queue * q = (struct Queue *)malloc(sizeof(struct Queue));
+void initialize(char ** argv) {
+        work = 1;
+        Signal(SIGINT,  sigint_handler);   /* ctrl-c */
+        Signal(SIGTSTP, sigint_handler);  /* ctrl-z */
+        q = (struct Queue *)malloc(sizeof(struct Queue));
         q->front = q->rear = 0;
         Sem_init(&mutex, 0, 1);
         Sem_init(&semaphore, 0, 0);
-
-        enqueue(q, sum);
-        enqueue(q, minus);
-        funcPtr mySum = dequeue(q);
-        printf("using funcPtr %d \n", mySum(10));
-        mySum = dequeue(q);
-        printf("using funcPtr %d \n", mySum(10));
-        pthread_t * tids = (pthread_t *)malloc(sizeof(pthread_t) * atoi(argv[1])); 
-        initializeThreads(tids, atoi(argv[1]));
-        killThreads(tids, atoi(argv[1]));
-
-        printf("%s", argv[1]);
-        return 0;
+        tids = (pthread_t *)malloc(sizeof(pthread_t) * atoi(argv[1])); 
+        threadCount = atoi(argv[1]);
+        initializeThreads(tids, threadCount);
 }
 
 /**************** Threads Routines ****************/
@@ -59,11 +46,12 @@ void initializeThreads(pthread_t * tids, int threadCount) {
         for(int i = 0; i < threadCount; i++) {
                 ptr = (int*)malloc(sizeof(int));
                 *ptr = i;
-                Pthread_create(&tids[*ptr], NULL, thread, ptr);
+                Pthread_create(&tids[*ptr], NULL, &thread, ptr);
         }
 }
 
 void killThreads(pthread_t * tids, int threadCount) {
+        work = 0;
         for(int i = 0; i < threadCount; i++) {
                 pthread_join(tids[i], NULL);
         }
@@ -71,17 +59,24 @@ void killThreads(pthread_t * tids, int threadCount) {
 
 void Pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg) {
         if(pthread_create(thread, attr, start_routine, arg) != 0) {
-                printf("created thread");
                 perror("error creating thread ");
         }
 }
 
-void * thread(void * arg) {
+void thread(void * arg) {
         int myId = *((int*)(arg));
+        free(arg);
         printf("hello from thread %d \n", myId);
-        //while(1) {
+        while(work) {
+                P(&semaphore);
+                printf("Thread %d acquired control \n", myId);
+                P(&mutex);
+                printf("Thread %d gained access to queue \n", myId);
+                funcPtr ptr = dequeue(q);
+                V(&mutex);
+                printf("calc result from thread %d is %d \n", myId, ptr(myId));
 
-        //}
+        }
 
 }
 
@@ -107,4 +102,35 @@ void Sem_init(sem_t * sem, int pshared, unsigned int value) {
         if(sem_init(sem, pshared, value) != 0) {
                 perror("error sem_wait ");
         }
+}
+
+
+/**************** Jobs Routines ****************/
+
+void addJob(funcPtr fp) {
+        P(&mutex);
+        enqueue(q, fp);
+        V(&mutex);
+        V(&semaphore);
+}
+
+
+handler_t *Signal(int signum, handler_t *handler) 
+{
+    struct sigaction action, old_action;
+
+    action.sa_handler = handler;  
+    sigemptyset(&action.sa_mask); /* block sigs of type being handled */
+    action.sa_flags = SA_RESTART; /* restart syscalls if possible */
+
+    if (sigaction(signum, &action, &old_action) < 0)
+	perror("Signal error");
+    return (old_action.sa_handler);
+}
+
+void sigint_handler(int sig) {
+        killThreads(tids, threadCount);
+        free(q);
+        free(tids);
+        exit(0);
 }

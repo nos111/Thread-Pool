@@ -3,6 +3,7 @@
 #include "queue.h"
 
 void enqueue(struct Queue * q, funcPtr fp) {
+        printf("adding to queue \n");
         int index = q->rear + 1;
         if(index >= MAXTHREADS) {
                 index = 0;
