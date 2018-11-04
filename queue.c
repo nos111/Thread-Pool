@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "queue.h"
 
 void enqueue(struct Queue * q, funcPtr fp) {
@@ -7,9 +8,10 @@ void enqueue(struct Queue * q, funcPtr fp) {
                 index = 0;
         }
         if(index == q->front) {
-                printf("Queue is full");
-                return;
+                printf("Queue is full \n");
+                exit(0);
         }
+        q->rear = q->rear + 1;
         q->fp[index] = fp;
 }
 
@@ -18,10 +20,11 @@ funcPtr dequeue(struct Queue * q) {
         if(index >= MAXTHREADS) {
                 index = 0;
         }
-        if(index == q->rear) {
-                printf("Queue is empty");
-                return NULL;
+        if(index == q->rear + 1) {
+                printf("Queue is empty \n");
+                exit(0);
         }
+        q->front = index;
         return q->fp[index];
 }
 

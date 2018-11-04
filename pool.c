@@ -1,14 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include "pool.h"
+#include "queue.h"
 
+/* 
+        - Add job to queue
+        - Each thread will try to extract a job once the semaphore is increased
+        - Only the thread that locks the mutex can access the jobs queue
+        - Loop while you can
+*/
 
-//make queue
-//initialize threadds
-//add thread to queue
-//extract thread for every job
-//return the thread after it finishes execution
+sem_t mutex;
+sem_t semaphore;
+
+int sum(int x) {
+        printf("%d \n", x + 2);
+        return x + 2;
+}
+
+int minus(int x) {
+        printf("%d \n", x - 2);
+        return x - 2;
+}
 
 
 
@@ -18,7 +33,17 @@ int main(int argc, char ** argv) {
                 printf("Usage: <thread count> \n");
                 return 0;
         }
+        struct Queue * q = (struct Queue *)malloc(sizeof(struct Queue));
+        q->front = q->rear = 0;
+        Sem_init(&mutex, 0, 1);
+        Sem_init(&semaphore, 0, 0);
 
+        enqueue(q, sum);
+        enqueue(q, minus);
+        funcPtr mySum = dequeue(q);
+        printf("using funcPtr %d \n", mySum(10));
+        mySum = dequeue(q);
+        printf("using funcPtr %d \n", mySum(10));
         pthread_t * tids = (pthread_t *)malloc(sizeof(pthread_t) * atoi(argv[1])); 
         initializeThreads(tids, atoi(argv[1]));
         killThreads(tids, atoi(argv[1]));
@@ -26,6 +51,8 @@ int main(int argc, char ** argv) {
         printf("%s", argv[1]);
         return 0;
 }
+
+/**************** Threads Routines ****************/
 
 void initializeThreads(pthread_t * tids, int threadCount) {
         int * ptr;
@@ -58,3 +85,26 @@ void * thread(void * arg) {
 
 }
 
+/**************** Semaphores Routines ****************/
+
+
+//if s is non zero, s is decremented and we return
+//if s is zero, suspend thread until is is non zero
+void P(sem_t * s) {
+        if(sem_wait(s) != 0) {
+                perror("error P ");
+        }
+}
+
+//increase s by one and use sem post to notifiy any thread that is waiting for the semaphore to change
+void V(sem_t * s) {
+        if(sem_post(s) != 0) {
+                perror("error V ");
+        }
+}
+
+void Sem_init(sem_t * sem, int pshared, unsigned int value) {
+        if(sem_init(sem, pshared, value) != 0) {
+                perror("error sem_wait ");
+        }
+}
