@@ -72,6 +72,7 @@ int killThreads(pthread_t * tids, int threadCount) {
 }
 
 int thread(void * arg) {
+        funcPtr ptr;
         int returnValue = 0;
         int myId = *((int*)(arg));
         free(arg);
@@ -85,8 +86,10 @@ int thread(void * arg) {
                         return returnValue;
                 }
                 printf("Thread %d gained access to queue \n", myId);
-                funcPtr ptr = dequeue(q);
-                if((returnValue =sem_post(&mutex)) != 0) {
+                if((ptr = dequeue(q)) == NULL) {
+                        return QUEUE_EMPTY;
+                }
+                if((returnValue = sem_post(&mutex)) != 0) {
                         return returnValue;
                 }
                 printf("calc result from thread %d is %d \n", myId, ptr(myId));
@@ -103,7 +106,9 @@ int addJob(funcPtr fp) {
         if((returnValue = sem_wait(&mutex)) != 0) {
                 return returnValue;
         }
-        enqueue(q, fp);
+        if((returnValue = enqueue(q, fp)) != 0) {
+                return returnValue;
+        }
         if((returnValue =sem_post(&mutex)) != 0) {
                 return returnValue;
         }

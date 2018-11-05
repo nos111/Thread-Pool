@@ -2,18 +2,17 @@
 #include <stdlib.h>
 #include "queue.h"
 
-void enqueue(struct Queue * q, funcPtr fp) {
-        printf("adding to queue \n");
+int enqueue(struct Queue * q, funcPtr fp) {
         int index = q->rear + 1;
         if(index >= MAXTHREADS) {
                 index = 0;
         }
         if(index == q->front) {
-                printf("Queue is full \n");
-                exit(0);
+                return QUEUE_FULL;
         }
         q->rear = q->rear + 1;
         q->fp[index] = fp;
+        return 0;
 }
 
 funcPtr dequeue(struct Queue * q) {
@@ -22,8 +21,7 @@ funcPtr dequeue(struct Queue * q) {
                 index = 0;
         }
         if(index == q->rear + 1) {
-                printf("Queue is empty \n");
-                exit(0);
+                return NULL;
         }
         q->front = index;
         return q->fp[index];
