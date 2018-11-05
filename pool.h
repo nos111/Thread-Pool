@@ -3,7 +3,7 @@
 
 #define MAXTHREADS 200
 
-void initialize(int threadCount);
-void addJob(int (*funcPtr) (int x));
+int initialize(int threadCount);
+int addJob(int (*funcPtr) (int x));
 
 #endif

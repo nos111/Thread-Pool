@@ -8,117 +8,109 @@
 #include "queue.h"
 
 typedef void handler_t(int);
-void initializeThreads(pthread_t * tids, int threadCount);
-void thread(void * arg);
-void Pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
-void killThreads(pthread_t * tids, int threadCount);
-void Sem_init(sem_t * sem, int pshared, unsigned int value);
-void V(sem_t * s);
-void P(sem_t * s);
+#define MALLOCERROR 200
+
+int initializeThreads(pthread_t * tids, int threadCount);
+int thread(void * arg);
+int killThreads(pthread_t * tids, int threadCount);
 handler_t *Signal(int signum, handler_t *handler);
 void sigint_handler(int sig);
 
-/* 
-        - Add job to queue
-        - Each thread will try to extract a job once the semaphore is increased
-        - Only the thread that locks the mutex can access the jobs queue
-        - Loop while you can
-*/
+static sem_t mutex;                            //change names also change to static
+static sem_t semaphore;
+static struct Queue * q;
+static pthread_t * tids;
+static int loopThreadBool = 1;                         
+static int threadCount = MAXTHREADS;
 
-/**************** Global variables ****************/
-sem_t mutex;                            //change names also change to static
-sem_t semaphore;
-struct Queue * q;
-pthread_t * tids;
-int work = 1;                           //change name
-int threadCount = MAXTHREADS;
 
-void initialize(int tCount) {                             
+int initialize(int tCount) {
+        int errorCode = 0;                             
         Signal(SIGINT,  sigint_handler);   /* ctrl-c */
         Signal(SIGTSTP, sigint_handler);  /* ctrl-z */
         q = malloc(sizeof(struct Queue));
+        if(q == NULL) return MALLOCERROR;
         q->front = q->rear = 0;
-        Sem_init(&mutex, 0, 1);
-        Sem_init(&semaphore, 0, 0);
+
+        errorCode = sem_init(&mutex, 0, 1);
+        if(errorCode != 0) return errorCode;
+        errorCode = sem_init(&semaphore, 0, 0);
+        if(errorCode != 0) return errorCode;
+
         tids = malloc(sizeof(pthread_t) * tCount); 
+        if(tids == NULL) return MALLOCERROR;
         threadCount = tCount;
-        initializeThreads(tids, threadCount);
-        work = 1;  
+        errorCode = initializeThreads(tids, threadCount);
+        if(errorCode != 0) return errorCode;
+        loopThreadBool = 1;  
+        return errorCode;
 }
 
-/**************** Threads Routines ****************/
 
-void initializeThreads(pthread_t * tids, int threadCount) {
+int initializeThreads(pthread_t * tids, int threadCount) {
         int * ptr;
+        int returnValue = 0;
         for(int i = 0; i < threadCount; i++) {
                 ptr = (int*)malloc(sizeof(int));
+                if(ptr == NULL) return MALLOCERROR;
                 *ptr = i;
-                Pthread_create(&tids[*ptr], NULL, &thread, ptr);
+                returnValue = pthread_create(&tids[*ptr], NULL, &thread, ptr);
+                if(returnValue != 0) return returnValue;
         }
+        return returnValue;
 }
 
-void killThreads(pthread_t * tids, int threadCount) {
-        work = 0;
+int killThreads(pthread_t * tids, int threadCount) {
+        int returnValue = 0;
+        loopThreadBool = 0;
         for(int i = 0; i < threadCount; i++) {
-                pthread_cancel(tids[i]);
+                if((returnValue = pthread_cancel(tids[i])) != 0) {
+                        return returnValue;
+                }
         }
+        return returnValue;
 }
 
-void Pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg) {
-        if(pthread_create(thread, attr, start_routine, arg) != 0) {
-                perror("error creating thread ");
-        }
-}
-
-void thread(void * arg) {
+int thread(void * arg) {
+        int returnValue = 0;
         int myId = *((int*)(arg));
         free(arg);
         printf("hello from thread %d \n", myId);
-        while(work) {
-                P(&semaphore);
+        while(loopThreadBool) {
+                if((returnValue = sem_wait(&semaphore)) != 0) {
+                        return returnValue;
+                }
                 printf("Thread %d acquired control \n", myId);
-                P(&mutex);
+                if((returnValue = sem_wait(&mutex)) != 0) {
+                        return returnValue;
+                }
                 printf("Thread %d gained access to queue \n", myId);
                 funcPtr ptr = dequeue(q);
-                V(&mutex);
+                if((returnValue =sem_post(&mutex)) != 0) {
+                        return returnValue;
+                }
                 printf("calc result from thread %d is %d \n", myId, ptr(myId));
-
         }
+        return returnValue;
 
-}
-
-/**************** Semaphores Routines ****************/
-
-
-//if s is non zero, s is decremented and we return
-//if s is zero, suspend thread until is is non zero
-void P(sem_t * s) {
-        if(sem_wait(s) != 0) {
-                perror("error P ");
-        }
-}
-
-//increase s by one and use sem post to notifiy any thread that is waiting for the semaphore to change
-void V(sem_t * s) {
-        if(sem_post(s) != 0) {
-                perror("error V ");
-        }
-}
-
-void Sem_init(sem_t * sem, int pshared, unsigned int value) {
-        if(sem_init(sem, pshared, value) != 0) {
-                perror("error sem_wait ");
-        }
 }
 
 
 /**************** Jobs Routines ****************/
 
-void addJob(funcPtr fp) {
-        P(&mutex);
+int addJob(funcPtr fp) {
+        int returnValue = 0;
+        if((returnValue = sem_wait(&mutex)) != 0) {
+                return returnValue;
+        }
         enqueue(q, fp);
-        V(&mutex);
-        V(&semaphore);
+        if((returnValue =sem_post(&mutex)) != 0) {
+                return returnValue;
+        }
+        if((returnValue =sem_post(&semaphore)) != 0) {
+                return returnValue;
+        }
+        return returnValue;
 }
 
 
@@ -126,15 +118,15 @@ void addJob(funcPtr fp) {
 
 handler_t *Signal(int signum, handler_t *handler) 
 {
-    struct sigaction action, old_action;
+        struct sigaction action, old_action;
 
-    action.sa_handler = handler;  
-    sigemptyset(&action.sa_mask); /* block sigs of type being handled */
-    action.sa_flags = SA_RESTART; /* restart syscalls if possible */
-
-    if (sigaction(signum, &action, &old_action) < 0)
-	perror("Signal error");
-    return (old_action.sa_handler);
+        action.sa_handler = handler;  
+        sigemptyset(&action.sa_mask); /* block sigs of type being handled */
+        action.sa_flags = SA_RESTART; /* restart syscalls if possible */
+        int errorCode;
+        if ((errorCode = sigaction(signum, &action, &old_action) < 0))
+                perror("Signal error");
+        return (old_action.sa_handler);
 }
 
 void sigint_handler(int sig) {
