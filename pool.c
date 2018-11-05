@@ -16,7 +16,8 @@ int killThreads(pthread_t * tids, int threadCount);
 handler_t *Signal(int signum, handler_t *handler);
 void sigint_handler(int sig);
 
-static sem_t mutex;                            //change names also change to static
+
+static pthread_mutex_t queueLock;                         
 static sem_t semaphore;
 static struct Queue * q;
 static pthread_t * tids;
@@ -32,7 +33,7 @@ int initialize(int tCount) {
         if(q == NULL) return MALLOCERROR;
         q->front = q->rear = 0;
 
-        errorCode = sem_init(&mutex, 0, 1);
+        errorCode = pthread_mutex_init(&queueLock, NULL);
         if(errorCode != 0) return errorCode;
         errorCode = sem_init(&semaphore, 0, 0);
         if(errorCode != 0) return errorCode;
@@ -82,14 +83,14 @@ int thread(void * arg) {
                         return returnValue;
                 }
                 printf("Thread %d acquired control \n", myId);
-                if((returnValue = sem_wait(&mutex)) != 0) {
+                if((returnValue = pthread_mutex_lock(&queueLock)) != 0) {
                         return returnValue;
                 }
                 printf("Thread %d gained access to queue \n", myId);
                 if((ptr = dequeue(q)) == NULL) {
                         return QUEUE_EMPTY;
                 }
-                if((returnValue = sem_post(&mutex)) != 0) {
+                if((returnValue = pthread_mutex_unlock(&queueLock)) != 0) {
                         return returnValue;
                 }
                 printf("calc result from thread %d is %d \n", myId, ptr(myId));
@@ -103,13 +104,13 @@ int thread(void * arg) {
 
 int addJob(funcPtr fp) {
         int returnValue = 0;
-        if((returnValue = sem_wait(&mutex)) != 0) {
+        if((returnValue = pthread_mutex_lock(&queueLock)) != 0) {
                 return returnValue;
         }
         if((returnValue = enqueue(q, fp)) != 0) {
                 return returnValue;
         }
-        if((returnValue =sem_post(&mutex)) != 0) {
+        if((returnValue = pthread_mutex_unlock(&queueLock)) != 0) {
                 return returnValue;
         }
         if((returnValue =sem_post(&semaphore)) != 0) {
