@@ -1,7 +1,5 @@
 #ifndef POOL_H
 #define POOL_H
-#include <pthread.h>
-#include <semaphore.h>
 
 #define MAXTHREADS 200
 

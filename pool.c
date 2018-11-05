@@ -26,24 +26,24 @@ void sigint_handler(int sig);
 */
 
 /**************** Global variables ****************/
-sem_t mutex;
+sem_t mutex;                            //change names also change to static
 sem_t semaphore;
 struct Queue * q;
 pthread_t * tids;
-int work = 1;
+int work = 1;                           //change name
 int threadCount = MAXTHREADS;
 
-void initialize(int tCount) {
-        work = 1;
+void initialize(int tCount) {                             
         Signal(SIGINT,  sigint_handler);   /* ctrl-c */
         Signal(SIGTSTP, sigint_handler);  /* ctrl-z */
-        q = (struct Queue *)malloc(sizeof(struct Queue));
+        q = malloc(sizeof(struct Queue));
         q->front = q->rear = 0;
         Sem_init(&mutex, 0, 1);
         Sem_init(&semaphore, 0, 0);
-        tids = (pthread_t *)malloc(sizeof(pthread_t) * tCount); 
+        tids = malloc(sizeof(pthread_t) * tCount); 
         threadCount = tCount;
         initializeThreads(tids, threadCount);
+        work = 1;  
 }
 
 /**************** Threads Routines ****************/
@@ -60,7 +60,7 @@ void initializeThreads(pthread_t * tids, int threadCount) {
 void killThreads(pthread_t * tids, int threadCount) {
         work = 0;
         for(int i = 0; i < threadCount; i++) {
-                pthread_join(tids[i], NULL);
+                pthread_cancel(tids[i]);
         }
 }
 
