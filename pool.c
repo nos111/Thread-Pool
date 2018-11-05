@@ -18,7 +18,7 @@ void sigint_handler(int sig);
 
 
 static pthread_mutex_t queueLock;                         
-static sem_t semaphore;
+static sem_t threadRunLock;
 static struct Queue * q;
 static pthread_t * tids;
 static int loopThreadBool = 1;                         
@@ -35,7 +35,7 @@ int initialize(int tCount) {
 
         errorCode = pthread_mutex_init(&queueLock, NULL);
         if(errorCode != 0) return errorCode;
-        errorCode = sem_init(&semaphore, 0, 0);
+        errorCode = sem_init(&threadRunLock, 0, 0);
         if(errorCode != 0) return errorCode;
 
         tids = malloc(sizeof(pthread_t) * tCount); 
@@ -79,7 +79,7 @@ int thread(void * arg) {
         free(arg);
         printf("hello from thread %d \n", myId);
         while(loopThreadBool) {
-                if((returnValue = sem_wait(&semaphore)) != 0) {
+                if((returnValue = sem_wait(&threadRunLock)) != 0) {
                         return returnValue;
                 }
                 printf("Thread %d acquired control \n", myId);
@@ -113,7 +113,7 @@ int addJob(funcPtr fp) {
         if((returnValue = pthread_mutex_unlock(&queueLock)) != 0) {
                 return returnValue;
         }
-        if((returnValue =sem_post(&semaphore)) != 0) {
+        if((returnValue =sem_post(&threadRunLock)) != 0) {
                 return returnValue;
         }
         return returnValue;
